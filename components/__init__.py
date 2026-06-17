@@ -1,0 +1,1 @@
+"""Simulated firmware components."""

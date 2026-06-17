@@ -1,0 +1,1 @@
+"""Fan controller component."""
