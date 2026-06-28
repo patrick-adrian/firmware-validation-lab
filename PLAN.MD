@@ -4,6 +4,16 @@
 > Target environment: **Linux** (WSL Ubuntu), `gcc`, `python3` (stdlib only), `gdb`, `make`.
 > Philosophy: mirror a semiconductor-company validation team (AMD-style) — clarity,
 > debuggability, reproducibility, low-level realism. **No heavy frameworks, no CI vendor lock-in.**
+>
+> **Relationship to `firmware-validation-lab` (sibling project): separate codebase, shared
+> results contract.** That project is the *system/behavioral* tier (Python FastAPI sim of
+> thermal→fan→power, pytest, black-box HTTP). This project (`lab2`) is the *unit/driver* tier
+> (real compiled C + mock HAL + GDB). They are different validation altitudes, NOT duplicates.
+> Decision: keep the codebases separate (lab2 stays stdlib-only — no FastAPI/pydantic/pytest),
+> but lab2 emits the **same SQLite schema and report JSON format** so both tiers feed one
+> dashboard/Grafana "validation cockpit." We do NOT replicate lab's HTTP-microservice transport
+> (an unrealistic embedded analog) or its `time.sleep()` propagation (flaky) — lab2 uses
+> link-time mock-HAL substitution and a deterministic mock clock instead. See §11.
 
 ---
 
@@ -33,8 +43,9 @@ firmware-validation-lab/
 ├── framework/              # Python test framework (core, stdlib only)
 │   ├── __init__.py
 │   ├── runner.py           # CLI + test execution engine (python -m framework.runner)
-│   ├── logger.py           # structured per-test logging
-│   ├── report.py           # JSON (+ optional HTML) reports
+│   ├── logger.py           # structured per-test logging (JSONL, lab-compatible)
+│   ├── db.py               # SQLite results store (SAME schema as sibling lab: test_runs/events)
+│   ├── report.py           # JSON (+ optional HTML) reports (SAME JSON shape as sibling lab)
 │   ├── build.py            # compile C modules -> runtime/ (.so and executables)
 │   ├── config.py           # build flags + test configuration
 │   ├── cinterface.py       # Python<->C glue: ctypes loader + subprocess runner
@@ -149,8 +160,15 @@ Two equivalent front-ends sharing one flag set (defined in `framework/config.py`
   - `python -m framework.runner --gdb test_uart` — run that module's binaries under GDB.
   - `python -m framework.runner --debug` — auto-launch GDB on any crash.
   - `--no-build`, `--report json|html`, `--verbose`, `--list`.
-- **Reports (`report.py`):** JSON always (`runtime/report.json`): per-test status, duration,
-  stdout/stderr, captured GDB backtrace on crash, build warnings. Optional self-contained HTML.
+- **Reports (`report.py`):** JSON always (`runtime/report.json`), in the **same shape as the
+  sibling lab** (`generated_at`, `test_summary{pass_count,fail_count,exit_code,
+  execution_duration_seconds}`, `failure_breakdown[]`, `recent_test_runs[]`). Per-test extras
+  (stdout/stderr, GDB backtrace on crash, build warnings) attach as `events`. Optional HTML.
+- **Results store (`db.py`):** SQLite using the **identical schema** to the sibling lab —
+  `test_runs(id, test_name, result, execution_time, timestamp)` and
+  `events(id, component, event_type, details, timestamp)`. A GDB backtrace is stored as an
+  `event` (`component=<module>`, `event_type='CRASH'`, `details=<backtrace>`). This is the
+  integration seam: both tiers write compatible rows → one dashboard.
 
 ---
 
@@ -194,6 +212,26 @@ Two equivalent front-ends sharing one flag set (defined in `framework/config.py`
 10. Smoke run: `python -m framework.runner`; verify report + a deliberate crash → GDB backtrace.
 
 ---
+
+## 11. Integration with `firmware-validation-lab` (shared results contract)
+
+**Stance:** two separate repos, one results contract. No code merge, no shared venv.
+
+What lab2 **adopts** from the sibling lab (so both tiers converge on one dashboard):
+- The SQLite schema (`test_runs`, `events`) — copied, not imported, to keep lab2 dependency-free.
+- The report JSON shape (see §6) — a lab2 run produces a file the sibling's `report_generator`
+  conventions already understand.
+- The future Grafana/Prometheus endpoint: lab2's SQLite becomes a second data source (or both
+  point at the same DB file / a shared `validation.db`), giving a unit-tier + system-tier cockpit.
+
+What lab2 deliberately **rejects** from the sibling lab:
+- FastAPI/uvicorn microservices as the "firmware" — wrong embedded analog; lab2 links real C
+  against a mock HAL at build time instead.
+- `time.sleep()`-based event propagation — flaky/slow; lab2 uses a deterministic mock clock.
+- pytest + pydantic + requests — lab2 stays **stdlib-only** + gcc/gdb.
+
+Net: lab2 is the lower validation tier (drivers, registers, CRC, buffers, crashes/GDB); the
+sibling lab is the upper tier (component behavior). Same results store, same reports, separate code.
 
 ## 10. Future Extensions
 

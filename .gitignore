@@ -1,0 +1,12 @@
+# Build artifacts
+runtime/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Editor / OS
+*.swp
+.DS_Store
