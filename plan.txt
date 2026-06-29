@@ -1,0 +1,46 @@
+1. Test automation framework (mini regression system)
+A Python framework that:
+runs “test cases”
+logs outputs
+compares expected vs actual
+generates pass/fail reports
+
+Include:
+parallel execution (optional)
+retry logic
+structured logs
+
+2. Register-level “fake hardware” simulator (BEST ONE)
+A C/C++ program that simulates a device with:
+memory-mapped registers
+status/control bits
+state machine behavior
+
+Example:
+CTRL, STATUS, DATA registers
+writing bits triggers state transitions
+invalid sequences produce errors
+
+3. Cache simulator (VERY strong signal)
+simulate L1/L2 cache behavior
+measure hit/miss rates
+test different access patterns
+
+4. CI Result Dashboard (lightweight)
+
+What it simulates:
+internal test dashboards
+
+Build:
+simple web UI (React or Python Flask)
+shows:
+test history
+pass/fail trends
+most common failures
+
+-------------------------------------------------------------------------------------------------------------------
+1. Python framework (runner, logging, reporting)
+2. C modules (drivers, utilities, firmware-like components)
+3. Python tests against those C modules
+4. Mock hardware to simulate peripherals
+5. Real STM32 hardware using largely the same framework
