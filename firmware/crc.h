@@ -7,8 +7,8 @@
 #ifndef CRC_H
 #define CRC_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include <stddef.h> // for size_t
+#include <stdint.h> // for uint32_t
 
 /*
  * Compute CRC-32 over `len` bytes at `data`.
